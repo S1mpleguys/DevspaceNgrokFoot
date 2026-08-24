@@ -1,0 +1,16 @@
+# Runtime logs
+*.log
+
+# Local/generated Edge Native Messaging registration
+edge-integration/native-host-manifest.json
+
+# Portable release archives
+DevspaceNgrokFoot-Portable-*.zip
+
+# Common local build/editor artifacts
+bin/
+obj/
+.vs/
+*.user
+*.suo
+

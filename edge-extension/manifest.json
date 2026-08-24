@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "DevSpace Auto Start for ChatGPT",
+  "version": "1.0.0",
+  "description": "Starts DevspaceNgrokFoot when the configured ChatGPT project or Temporary Chat is opened.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5PN7i7uFWM5nOCspLqvvTIxAPqBOIa+LECl13Bv5TqbQvBYf79zTBAWvwIqGlNjfBbJRR0mjqBEd38lqqxH5oTZFocMAXN5q5fQmx4gMSpfTMbfVR5K9EyH7Klj9ZedK3PuCBlF3ytBwfuuQx4+SPhKO7a2YBspWJ+EQ+qdv7ZW5Oh/0vA2Z2WCL5vjZtbo/gUrDqdIf2SRFp3kFrg410XKzxiHSiQe8ELrLic07Lp1oibZFyPm2wnBv2YNf+mmPcaEbLFcSxiz1Vdz01pacEq5R1ydEhord6LoYGUPOTKI1FbFFA1Hqz3gWCvPUSUqXIEpw3My0lSwuD9udbGM9ZwIDAQAB",
+  "permissions": [
+    "nativeMessaging",
+    "tabs",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
