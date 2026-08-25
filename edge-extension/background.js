@@ -1,6 +1,7 @@
 const HOST_NAME = "com.devspacengrokfoot.launcher";
 const PROJECT_PREFIX = "/g/g-p-6a709f3c5ef08191bc68fc40b7a05804-/project";
 const recentByTab = new Map();
+let lastGlobalEnsureAt = 0;
 
 function shouldStart(rawUrl) {
   if (!rawUrl) return false;
@@ -20,9 +21,12 @@ function ensureRunning(tabId, rawUrl) {
   if (!shouldStart(rawUrl)) return;
 
   const now = Date.now();
+  if (now - lastGlobalEnsureAt < 1500) return;
+
   const previous = recentByTab.get(tabId);
   if (previous && previous.url === rawUrl && now - previous.time < 5000) return;
   recentByTab.set(tabId, { url: rawUrl, time: now });
+  lastGlobalEnsureAt = now;
 
   chrome.runtime.sendNativeMessage(
     HOST_NAME,

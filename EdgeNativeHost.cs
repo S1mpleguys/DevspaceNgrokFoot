@@ -7,6 +7,7 @@ using System.Threading;
 internal static class EdgeNativeHost
 {
     private const string MutexName = "Local\\DevspaceNgrokFoot.Tray";
+    private const string LaunchMutexName = "Local\\DevspaceNgrokFoot.NativeHostLaunch";
     private const int MaxRequestBytes = 1024 * 1024;
 
     private static int Main(string[] args)
@@ -19,41 +20,65 @@ internal static class EdgeNativeHost
                 return 0;
             }
 
-            bool alreadyRunning = IsTrayRunning();
-            bool started = false;
-
-            if (!alreadyRunning)
+            using (var launchMutex = new Mutex(false, LaunchMutexName))
             {
-                string launcher = Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory,
-                    "DevspaceNgrokFoot.exe");
-
-                if (!File.Exists(launcher))
+                bool lockTaken = false;
+                try
                 {
-                    WriteResponse(false, false, false, "DevspaceNgrokFoot.exe not found.");
-                    return 2;
+                    lockTaken = launchMutex.WaitOne(3000);
+                    if (!lockTaken)
+                    {
+                        WriteResponse(false, false, false, "Timed out waiting for launcher lock.");
+                        return 4;
+                    }
+
+                    bool alreadyRunning = IsTrayRunning();
+                    bool started = false;
+
+                    if (!alreadyRunning)
+                    {
+                        string launcher = Path.Combine(
+                            AppDomain.CurrentDomain.BaseDirectory,
+                            "DevspaceNgrokFoot.exe");
+
+                        if (!File.Exists(launcher))
+                        {
+                            WriteResponse(false, false, false, "DevspaceNgrokFoot.exe not found.");
+                            return 2;
+                        }
+
+                        var startInfo = new ProcessStartInfo();
+                        startInfo.FileName = launcher;
+                        startInfo.Arguments = "--ensure-running";
+                        startInfo.WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory;
+                        // Detach the tray app from the Native Messaging stdio pipes.
+                        // Otherwise the child can keep Edge's pipe handles open even
+                        // after this one-shot host has written its response and exited.
+                        startInfo.UseShellExecute = true;
+
+                        using (var process = Process.Start(startInfo))
+                        {
+                            started = process != null;
+                        }
+
+                        for (int i = 0; i < 20 && !IsTrayRunning(); i++)
+                        {
+                            Thread.Sleep(100);
+                        }
+                    }
+
+                    bool running = IsTrayRunning();
+                    WriteResponse(running, started, alreadyRunning, running ? null : "Launcher did not become ready.");
+                    return running ? 0 : 3;
                 }
-
-                var startInfo = new ProcessStartInfo();
-                startInfo.FileName = launcher;
-                startInfo.WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory;
-                startInfo.UseShellExecute = false;
-                startInfo.CreateNoWindow = true;
-
-                using (var process = Process.Start(startInfo))
+                finally
                 {
-                    started = process != null;
-                }
-
-                for (int i = 0; i < 20 && !IsTrayRunning(); i++)
-                {
-                    Thread.Sleep(100);
+                    if (lockTaken)
+                    {
+                        launchMutex.ReleaseMutex();
+                    }
                 }
             }
-
-            bool running = IsTrayRunning();
-            WriteResponse(running, started, alreadyRunning, running ? null : "Launcher did not become ready.");
-            return running ? 0 : 3;
         }
         catch (Exception ex)
         {

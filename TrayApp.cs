@@ -12,13 +12,28 @@ internal static class Program
     private const string MutexName = "Local\\DevspaceNgrokFoot.Tray";
 
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
+        bool silentEnsure = false;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (string.Equals(args[i], "--ensure-running", StringComparison.OrdinalIgnoreCase))
+            {
+                silentEnsure = true;
+                break;
+            }
+        }
+
         bool createdNew;
         using (var mutex = new Mutex(true, MutexName, out createdNew))
         {
             if (!createdNew)
             {
+                if (silentEnsure)
+                {
+                    return;
+                }
+
                 MessageBox.Show(
                     "DevSpace + ngrok 托盘程序已经在运行。",
                     "DevspaceNgrokFoot",
@@ -39,6 +54,7 @@ internal sealed class TrayContext : ApplicationContext
     private readonly NotifyIcon trayIcon;
     private readonly Icon appIcon;
     private readonly string baseDirectory;
+    private readonly System.Windows.Forms.Timer startupTimer;
     private Process devspaceProcess;
     private Process ngrokProcess;
     private bool shuttingDown;
@@ -72,6 +88,23 @@ internal sealed class TrayContext : ApplicationContext
         trayIcon.ContextMenuStrip = menu;
         trayIcon.Visible = true;
 
+        LogLauncher("tray_created");
+
+        startupTimer = new System.Windows.Forms.Timer();
+        startupTimer.Interval = 100;
+        startupTimer.Tick += delegate
+        {
+            startupTimer.Stop();
+            startupTimer.Dispose();
+            StartServices();
+        };
+        startupTimer.Start();
+    }
+
+    private void StartServices()
+    {
+        LogLauncher("service_start_begin");
+
         try
         {
             bool devspaceAlreadyRunning = IsDevspaceAvailable();
@@ -103,9 +136,15 @@ internal sealed class TrayContext : ApplicationContext
                 "\r\n右键托盘图标可退出。";
             trayIcon.BalloonTipIcon = ToolTipIcon.Info;
             trayIcon.ShowBalloonTip(2500);
+            LogLauncher(
+                "service_start_ready devspace=" +
+                (devspaceAlreadyRunning ? "reused" : "started") +
+                " ngrok=" +
+                (ngrokAlreadyRunning ? "reused" : "started"));
         }
         catch (Exception ex)
         {
+            LogLauncher("service_start_failed " + ex.ToString());
             StopChildren();
             trayIcon.Visible = false;
             MessageBox.Show(
@@ -114,6 +153,20 @@ internal sealed class TrayContext : ApplicationContext
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
             ExitThread();
+        }
+    }
+
+    private void LogLauncher(string message)
+    {
+        try
+        {
+            string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") +
+                " [PID " + Process.GetCurrentProcess().Id + "] " + message + Environment.NewLine;
+            File.AppendAllText(Path.Combine(baseDirectory, "launcher.log"), line);
+        }
+        catch
+        {
+            // Diagnostic logging must never break the launcher.
         }
     }
 
